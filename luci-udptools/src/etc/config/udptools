@@ -1,0 +1,12 @@
+
+config udpconfig
+	option password 'passwd'
+	option timeout '0'
+	option client '127.0.0.1'
+	option server '11.11.11.11'
+	option serverport '1111'
+	option fec '2:4'
+	option auto '1'
+	option clientport '3333'
+	option enable '1'
+

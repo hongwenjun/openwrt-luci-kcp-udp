@@ -1,0 +1,37 @@
+#!/bin/sh /etc/rc.common
+START=90
+
+run_udp()
+{
+	local server
+	local serverport
+	local client
+	local clientport
+	local password
+	local fec
+	local timeout
+        
+	config_get server $1 server
+	config_get serverport $1 serverport  
+	config_get client $1 client 
+	config_get clientport $1 clientport  
+	config_get password $1 password  
+	config_get fec $1 fec  
+	config_get timeout $1 timeout
+	(udpspeeder -c -l$client:$clientport -r127.0.0.1:21333 -f$fec --mode 0 --timeout $timeout  >/dev/null 2>&1 )&
+	(udp2raw -c -l127.0.0.1:21333 -r$server:$serverport --raw-mode faketcp -a -k $password >/dev/null 2>&1 )&
+	ip route add $server via $(ip route | awk '$1=="default" {print $3}')
+}
+
+start()
+{
+	config_load udptools
+	config_foreach run_udp udpconfig    
+}
+
+stop()
+{
+    
+	killall -9 udpspeeder
+	killall -9 udp2raw
+}
