@@ -1,0 +1,34 @@
+#!/bin/sh /etc/rc.common
+START=90
+
+run_kcp()
+{
+	local server
+	local serverport
+	local client
+	local clientport
+	local password
+
+	config_get server $1 server
+	config_get serverport $1 serverport
+	config_get client $1 client
+	config_get clientport $1 clientport
+	config_get password $1 password
+
+	(kcp-client -r 127.0.0.1:4000 -l :$clientport --key $password -mode fast2 -mtu 1300   >/dev/null 2>&1 )&
+	(udp2raw -c -l127.0.0.1:4000 -r$server:$serverport --raw-mode faketcp -a -k $password >/dev/null 2>&1 )&
+
+}
+
+start()
+{
+	config_load kcptools
+	config_foreach run_kcp kcpconfig
+}
+
+stop()
+{
+
+	killall -9 kcp-client
+	killall -9 udp2raw
+}

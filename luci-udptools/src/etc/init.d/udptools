@@ -18,7 +18,7 @@ run_udp()
 	config_get password $1 password  
 	config_get fec $1 fec  
 	config_get timeout $1 timeout
-	(udpspeeder -c -l$client:$clientport -r127.0.0.1:21333 -f$fec --mode 0 --timeout $timeout  >/dev/null 2>&1 )&
+	(udpspeeder -c -l$client:$clientport -r127.0.0.1:21333 -f$fec --mode 0 --timeout $timeout -k $password >/dev/null 2>&1 )&
 	(udp2raw -c -l127.0.0.1:21333 -r$server:$serverport --raw-mode faketcp -a -k $password >/dev/null 2>&1 )&
 	ip route add $server via $(ip route | awk '$1=="default" {print $3}')
 }

@@ -1,0 +1,10 @@
+
+config kcpconfig
+	option password 'passwd'
+	option client '127.0.0.1'
+	option server '11.11.11.11'
+	option serverport '1111'
+	option auto '1'
+	option clientport '3333'
+	option enable '1'
+
