@@ -7,4 +7,3 @@ config kcpconfig
 	option auto '1'
 	option clientport '3333'
 	option enable '1'
-
