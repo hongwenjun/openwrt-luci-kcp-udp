@@ -28,12 +28,12 @@ ln -s /usr/lib/x86_64-linux-gnu/libisl.so /usr/lib/libisl.so.10
 
 ### 下载 openwrt-luci-kcp-udp 到 opensdk/package
 	cd opensdk && git clone https://github.com/hongwenjun/openwrt-luci-kcp-udp.git
-	mv openwrt-luci-kcp-udp package 
+	mv openwrt-luci-kcp-udp/* package
 
 ### 配置make menuconfig; 在弹出的节目进入Luci—>3. applications，勾选为M即可，保存退出。
 	cd opensdk && make menuconfig
 
-### 使用命令编译 luci-udptools  luci-kcptools 
+### 使用命令编译 luci-udptools  luci-kcptools
 ```
 make package/luci-udptools/compile V=99
 make package/luci-kcptools/compile V=99
