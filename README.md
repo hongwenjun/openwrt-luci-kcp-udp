@@ -1,4 +1,10 @@
-# openwrt-luci-kcp-udp
+# openwrt-luci-kcp-udp  软件包
+
+###  OpenWRT 安装 WireGuard 配置 Udp2Raw + UdpSpeeder
+- 短网址: https://git.io/wrt.wg
+
+###  OpenWRT 安装 WireGuard 配置 Udp2Raw + KcpTun
+- 参考 Udp2Raw + UdpSpeeder ，基本相同
 
 ### OpenWRT-18.06.2 X64 固件和SDK 下载地址和文件名
 https://downloads.openwrt.org/releases/18.06.2/targets/x86/64/
@@ -38,3 +44,7 @@ make package/udpspeeder/compile V=99
 
 ```
 - 参考文件: 编译openwrt版udpspeeder和udp2raw [文章链接](https://www.atrandys.com/2018/1255.html)
+
+### kcp-client 软件下载 client_linux 改名成 kcp-client
+- https://github.com/xtaci/kcptun/releases
+- OpenWRT 存放路径  /usr/bin
