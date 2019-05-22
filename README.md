@@ -1,20 +1,20 @@
 # openwrt-luci-kcp-udp
 
-### OpenWRT-18.06.2 X64 ¹Ì¼şºÍSDK ÏÂÔØµØÖ·ºÍÎÄ¼şÃû
+### OpenWRT-18.06.2 X64 å›ºä»¶å’ŒSDK ä¸‹è½½åœ°å€å’Œæ–‡ä»¶å
 https://downloads.openwrt.org/releases/18.06.2/targets/x86/64/
 - openwrt-18.06.2-x86-64-combined-squashfs.img.gz
 - openwrt-sdk-18.06.2-x86-64_gcc-7.3.0_musl.Linux-x86_64.tar.xz
 
-### OpenWRT-18.06.2 x86 ¹Ì¼şºÍSDK ÏÂÔØµØÖ·ºÍÎÄ¼şÃû
+### OpenWRT-18.06.2 x86 å›ºä»¶å’ŒSDK ä¸‹è½½åœ°å€å’Œæ–‡ä»¶å
 https://downloads.openwrt.org/releases/18.06.2/targets/x86/generic/
 - openwrt-18.06.2-x86-generic-combined-squashfs.img.gz
 - openwrt-sdk-18.06.2-x86-generic_gcc-7.3.0_musl.Linux-x86_64.tar.xz
 
-### °´CPUÑ¡ÔñÏÂÔØSDKºó£¬ÔÚVPSÉÏ ½âÑ¹SDK²¢ÖØÃüÃûÎª opensdk
+### æŒ‰CPUé€‰æ‹©ä¸‹è½½SDKåï¼Œåœ¨VPSä¸Š è§£å‹SDKå¹¶é‡å‘½åä¸º opensdk
 	tar xvJf openwrt-sdk-18.06.2-x86-64_gcc-7.3.0_musl.Linux-x86_64.tar.xz
 	mv openwrt-sdk-18.06.2-x86-64_gcc-7.3.0_musl.Linux-x86_64 opensdk
 
-### °²×°±àÒë»·¾³
+### å®‰è£…ç¼–è¯‘ç¯å¢ƒ
 
 ```
 apt -y install subversion build-essential libncurses5-dev zlib1g-dev gawk git ccache gettext libssl-dev xsltproc wget unzip python time
@@ -22,14 +22,14 @@ apt -y install libcloog-isl-dev
 ln -s /usr/lib/x86_64-linux-gnu/libisl.so /usr/lib/libisl.so.10
 ```
 
-### ÏÂÔØ openwrt-luci-kcp-udp µ½ opensdk/package
+### ä¸‹è½½ openwrt-luci-kcp-udp åˆ° opensdk/package
 	cd opensdk && git clone https://github.com/hongwenjun/openwrt-luci-kcp-udp.git
 	mv openwrt-luci-kcp-udp/* package
 
-### ÅäÖÃmake menuconfig; ÔÚµ¯³öµÄ½ÚÄ¿½øÈëLuci¡ª>3. applications£¬¹´Ñ¡ÎªM¼´¿É£¬±£´æÍË³ö¡£
+### é…ç½®make menuconfig; åœ¨å¼¹å‡ºçš„èŠ‚ç›®è¿›å…¥Luciâ€”>3. applicationsï¼Œå‹¾é€‰ä¸ºMå³å¯ï¼Œä¿å­˜é€€å‡ºã€‚
 	cd opensdk && make menuconfig
 
-### Ê¹ÓÃÃüÁî±àÒë luci-udptools  luci-kcptools(Ä¿Ç°»¹Ã»µ÷ÊÔÍê³É)
+### ä½¿ç”¨å‘½ä»¤ç¼–è¯‘ luci-udptools  luci-kcptools(ç›®å‰è¿˜æ²¡è°ƒè¯•å®Œæˆ)
 ```
 make package/luci-udptools/compile V=99
 make package/luci-kcptools/compile V=99
@@ -37,4 +37,4 @@ make package/udp2raw/compile V=99
 make package/udpspeeder/compile V=99
 
 ```
-- ²Î¿¼ÎÄ¼ş: ±àÒëopenwrt°æudpspeederºÍudp2raw [ÎÄÕÂÁ´½Ó](https://www.atrandys.com/2018/1255.html)
+- å‚è€ƒæ–‡ä»¶: ç¼–è¯‘openwrtç‰ˆudpspeederå’Œudp2raw [æ–‡ç« é“¾æ¥](https://www.atrandys.com/2018/1255.html)

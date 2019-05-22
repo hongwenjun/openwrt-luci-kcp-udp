@@ -1,4 +1,3 @@
-
 config kcpconfig
 	option password 'passwd'
 	option client '127.0.0.1'
