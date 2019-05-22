@@ -6,6 +6,12 @@
 ###  OpenWRT 安装 WireGuard 配置 Udp2Raw + KcpTun
 - 参考 Udp2Raw + UdpSpeeder ，基本相同
 
+![](https://raw.githubusercontent.com/hongwenjun/openwrt-luci-kcp-udp/master/bin/lui_udp_kcp.png)
+
+### OpenWRT-18.06.2 编译完成的 安装包
+- udp2raw-tunne udpspeeder luci-udptools [安装包下载](https://github.com/hongwenjun/vps_setup/blob/master/openwrt-18.06.2/openwrt_udptools.zip)
+- 单独下载 [luci-udptools 和 luci-kcptools](https://raw.githubusercontent.com/hongwenjun/openwrt-luci-kcp-udp/master/bin) 图形管理配置包(全平台CPU通用)
+
 ### OpenWRT-18.06.2 X64 固件和SDK 下载地址和文件名
 https://downloads.openwrt.org/releases/18.06.2/targets/x86/64/
 - openwrt-18.06.2-x86-64-combined-squashfs.img.gz
