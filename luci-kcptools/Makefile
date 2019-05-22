@@ -32,9 +32,9 @@ endef
 define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/controller
 	$(INSTALL_DATA) ./src/luci/controller/*.lua $(1)/usr/lib/lua/luci/controller/
-	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/model/cbi
-	$(INSTALL_DATA) ./src/luci/model/cbi/*.lua $(1)/usr/lib/lua/luci/model/cbi/
-	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/view
+	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/model/cbi/kcptools
+	$(INSTALL_DATA) ./src/luci/model/cbi/kcptools/*.lua $(1)/usr/lib/lua/luci/model/cbi/kcptools/
+	$(INSTALL_DIR) $(1)/usr/lib/lua/luci/view/kcptools
 	$(INSTALL_DATA) ./src/luci/view/kcptools/*.htm $(1)/usr/lib/lua/luci/view/kcptools/
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./src/etc/config/kcptools $(1)/etc/config/kcptools
