@@ -3,7 +3,7 @@
 ![](https://raw.githubusercontent.com/hongwenjun/openwrt-luci-kcp-udp/master/bin/lui_udp_kcp.png)
 
 ### OpenWRT-18.06.2 编译完成的 安装包
-- udp2raw-tunne udpspeeder luci-udptools [安装包下载](https://github.com/hongwenjun/vps_setup/blob/master/openwrt-18.06.2/openwrt_udptools.zip)
+- udp2raw-tunne udpspeeder luci-udptools [安装包下载](https://github.com/hongwenjun/img/raw/master/openwrt/openwrt_udptools.zip)
 - 单独下载 [luci-udptools 和 luci-kcptools](https://github.com/hongwenjun/openwrt-luci-kcp-udp/tree/master/bin) 图形管理配置包(全平台CPU通用)
 
 ### KcpTun 软件下载 client_linux 改名成 kcp-client 存放路径 /usr/bin
