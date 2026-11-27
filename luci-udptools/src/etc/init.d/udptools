@@ -1,37 +1,248 @@
 #!/bin/sh /etc/rc.common
+# /etc/init.d/udptools
+
 START=90
+STOP=10
 
-run_udp()
-{
-	local server
-	local serverport
-	local client
-	local clientport
-	local password
-	local fec
-	local timeout
-        
-	config_get server $1 server
-	config_get serverport $1 serverport  
-	config_get client $1 client 
-	config_get clientport $1 clientport  
-	config_get password $1 password  
-	config_get fec $1 fec  
-	config_get timeout $1 timeout
-	(udpspeeder -c -l$client:$clientport -r127.0.0.1:21333 -f$fec --mode 0 --timeout $timeout -k $password >/dev/null 2>&1 )&
-	(udp2raw -c -l127.0.0.1:21333 -r$server:$serverport --raw-mode faketcp -a -k $password >/dev/null 2>&1 )&
-	ip route add $server via $(ip route | awk '$1=="default" {print $3}')
+NAME=udptools
+CFG=udptools
+RUN_DIR=/var/run
+LOG_DIR=/var/log
+
+SPEEDER_BIN=/usr/bin/udpspeeder
+UDP2RAW_BIN=/usr/bin/udp2raw
+
+# 内层本地中继端口 = 18000 + clientport
+PORT_BASE=18000
+
+# 记录本实例添加的 路由/防火墙 规则，供 stop 精确回收
+STATE="$RUN_DIR/$NAME.state"
+
+log() { logger -t "$NAME" -p "user.$1" "$2"; }
+
+is_v6() { case "$1" in *:*) return 0 ;; *) return 1 ;; esac; }
+
+# ---- 地址归一化：去括号 -> 判断族 -> IPv6 补 []，IPv4 绝不补 ----
+strip_br() { printf '%s' "$1" | tr -d '[]'; }
+fmt_addr() {
+	local a
+	a=$(strip_br "$1")
+	if is_v6 "$a"; then printf '[%s]' "$a"; else printf '%s' "$a"; fi
+}
+is_v4_literal() {
+	case "$1" in
+		""|*[!0-9.]*) return 1 ;;
+		*.*.*.*) return 0 ;;
+		*) return 1 ;;
+	esac
 }
 
-start()
-{
-	config_load udptools
-	config_foreach run_udp udpconfig    
+resolve_host() {
+	local h="$1" out t
+	for t in AAAA A; do
+		out=$(nslookup -type=$t "$h" 2>/dev/null \
+			| sed -n 's/^Address[[:space:]]*[0-9]*:[[:space:]]*//p' \
+			| grep -v '#' | head -n1)
+		[ -n "$out" ] && { printf '%s' "$out"; return 0; }
+	done
+	return 1
 }
 
-stop()
-{
-    
-	killall -9 udpspeeder
-	killall -9 udp2raw
+fw_cmd()  { if [ "$1" = "6" ]; then printf 'ip6tables'; else printf 'iptables'; fi; }
+fw_mask() { if [ "$1" = "6" ]; then printf '/128';      else printf '/32';      fi; }
+
+# ---- 清除 udp2raw 历史遗留的 udp2rawDwrW_* 链（顺序必须是 D -> F -> X）----
+cleanup_legacy_chains() {
+	local cmd chains c
+	for cmd in ip6tables iptables; do
+		command -v "$cmd" >/dev/null 2>&1 || continue
+
+		# 1) 删除 INPUT 里的跳转（引用）
+		"$cmd" -w 5 -S INPUT 2>/dev/null \
+			| grep 'udp2rawDwrW' \
+			| sed "s/^-A/$cmd -w 5 -D/" \
+			| sh 2>/dev/null
+
+		# 2) 清空链内规则
+		chains=$("$cmd" -w 5 -S 2>/dev/null | sed -n 's/^-N \(udp2rawDwrW[^ ]*\)$/\1/p')
+		for c in $chains; do
+			"$cmd" -w 5 -F "$c" 2>/dev/null
+		done
+
+		# 3) 删除已空的链
+		for c in $chains; do
+			"$cmd" -w 5 -X "$c" 2>/dev/null
+		done
+
+		[ -n "$chains" ] && log info "cleaned legacy chains: $cmd -> $(echo $chains)"
+	done
 }
+
+# ---- 静态 RST 抑制规则（替代 udp2raw 的 -a --keep-rule）----
+add_drop_rule() {
+	local fam="$1" host="$2" port="$3" cmd mask
+	cmd=$(fw_cmd "$fam"); mask=$(fw_mask "$fam")
+
+	command -v "$cmd" >/dev/null 2>&1 || {
+		log err "$cmd not found, RST suppression skipped"; return 1; }
+
+	if "$cmd" -w 5 -C INPUT -s "$host$mask" -p tcp --sport "$port" -j DROP 2>/dev/null; then
+		log info "drop rule already present: $host$mask tcp sport $port"
+	else
+		if "$cmd" -w 5 -I INPUT 1 -s "$host$mask" -p tcp --sport "$port" -j DROP 2>/dev/null; then
+			log info "drop rule installed: $host$mask tcp sport $port"
+		else
+			log err "drop rule install FAILED: $cmd -I INPUT 1 -s $host$mask -p tcp --sport $port -j DROP"
+			return 1
+		fi
+	fi
+
+	printf 'fw %s %s%s %s\n' "$fam" "$host" "$mask" "$port" >> "$STATE"
+	return 0
+}
+
+del_drop_rule() {
+	local fam="$1" hpfx="$2" port="$3" cmd
+	cmd=$(fw_cmd "$fam")
+	"$cmd" -w 5 -D INPUT -s "$hpfx" -p tcp --sport "$port" -j DROP 2>/dev/null
+}
+
+# ---- 把服务端地址钉在原网关，v4 / v6 分别处理 ----
+pin_route() {
+	local host="$1" fam="$2" gw dev pfx rtcmd
+	if [ "$fam" = "6" ]; then
+		gw=$(ip -6 route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="via"){print $(i+1); exit}}')
+		dev=$(ip -6 route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}')
+		pfx="$host/128"
+		rtcmd="ip -6 route"
+	else
+		gw=$(ip route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="via"){print $(i+1); exit}}')
+		dev=$(ip route show default 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="dev"){print $(i+1); exit}}')
+		pfx="$host/32"
+		rtcmd="ip route"
+	fi
+
+	[ -n "$gw" ] || { log err "no IPv$fam default route (via), skip pin $pfx"; return 1; }
+
+	if [ -n "$dev" ]; then
+		$rtcmd replace "$pfx" via "$gw" dev "$dev" metric 1 2>/dev/null
+	else
+		$rtcmd replace "$pfx" via "$gw" metric 1 2>/dev/null
+	fi
+
+	if [ $? -eq 0 ]; then
+		log info "route pinned: $pfx via $gw dev $dev"
+		printf 'route %s %s\n' "$fam" "$pfx" >> "$STATE"
+	else
+		log err "pin route failed: $rtcmd replace $pfx via $gw dev $dev"
+	fi
+}
+
+run_udp() {
+	local server serverport client clientport password fec timeout mtu enable auto
+	local host addr laddr fam mid pid
+
+	config_get enable     "$1" enable     1
+	config_get auto       "$1" auto       1
+	config_get server     "$1" server
+	config_get serverport "$1" serverport
+	config_get client     "$1" client     0.0.0.0
+	config_get clientport "$1" clientport
+	config_get password   "$1" password
+	config_get fec        "$1" fec
+	config_get timeout    "$1" timeout    8
+	config_get mtu        "$1" mtu        1150
+
+	[ "$enable" = "1" ] || { log notice "section $1 disabled, skip"; return 0; }
+	[ -n "$server" ] && [ -n "$serverport" ] || { log err "section $1: server/serverport 缺失"; return 1; }
+	[ -n "$clientport" ] || { log err "section $1: clientport 缺失"; return 1; }
+
+	# timeout=0 无意义（含义是"包在队列里最多等几 ms"），回落默认 8
+	case "$timeout" in ""|0) timeout=8 ;; esac
+	case "$mtu" in ""|0) mtu=1150 ;; esac
+
+	# 1) 地址归一化
+	host=$(strip_br "$server")
+	if ! is_v6 "$host" && ! is_v4_literal "$host"; then
+		host=$(resolve_host "$host") || { log err "无法解析 $server"; return 1; }
+	fi
+	if is_v6 "$host"; then fam=6; else fam=4; fi
+	addr=$(fmt_addr "$host")     # 给 udp2raw 用：v6 带 []，v4 不带
+	laddr=$(fmt_addr "$client")  # 给 udpspeeder 的 -l 用
+
+	mid=$(( PORT_BASE + clientport ))
+	[ "$mid" -lt 65535 ] || { log err "section $1: 内部端口 $mid 越界"; return 1; }
+
+	# 2) udpspeeder（客户端）：监听本机 clientport，转发到本地中继 mid
+	"$SPEEDER_BIN" -c -l"$laddr":"$clientport" -r 127.0.0.1:"$mid" \
+		-f "$fec" --mode 0 --mtu "$mtu" --timeout "$timeout" \
+		--report 10 --log-level 4 --disable-color \
+		-k "$password" >>"$LOG_DIR/udpspeeder.log" 2>&1 &
+	pid=$!
+	echo "$pid" > "$RUN_DIR/udpspeeder.$1.pid"
+	log info "section $1: udpspeeder pid=$pid listen=$laddr:$clientport relay=127.0.0.1:$mid mtu=$mtu timeout=$timeout"
+
+	# 3) 静态 RST 抑制规则：必须早于 udp2raw 启动
+	add_drop_rule "$fam" "$host" "$serverport"
+
+	# 4) udp2raw（客户端）：把中继流量伪装成 TCP 发往服务端
+	"$UDP2RAW_BIN" -c -l 127.0.0.1:"$mid" -r"$addr":"$serverport" \
+		--raw-mode faketcp \
+		--sock-buf 4096 --log-level 4 --disable-color \
+		-k "$password" >>"$LOG_DIR/udp2raw.log" 2>&1 &
+	pid=$!
+	echo "$pid" > "$RUN_DIR/udp2raw.$1.pid"
+	log info "section $1: udp2raw pid=$pid -> $addr:$serverport (ipv$fam)"
+
+	# 5) 路由钉原网关（v4/v6 分流）
+	[ "$auto" = "1" ] && pin_route "$host" "$fam"
+	return 0
+}
+
+start() {
+	mkdir -p "$RUN_DIR"
+	: > "$STATE"
+
+	cleanup_legacy_chains
+
+	config_load "$CFG"
+	config_foreach run_udp udpconfig
+}
+
+stop() {
+	# 先 TERM，让进程有机会自己收尾；再 -9 兜底
+	killall udp2raw     2>/dev/null
+	killall udpspeeder  2>/dev/null
+	sleep 1
+	killall -9 udp2raw    2>/dev/null
+	killall -9 udpspeeder 2>/dev/null
+
+	# 回收本次实例添加的规则
+	if [ -f "$STATE" ]; then
+		while read -r kind a b c; do
+			case "$kind" in
+				route)
+					[ -n "$b" ] || continue
+					if [ "$a" = "6" ]; then ip -6 route del "$b" 2>/dev/null
+					else ip route del "$b" 2>/dev/null; fi
+					;;
+				fw)
+					[ -n "$c" ] || continue
+					del_drop_rule "$a" "$b" "$c"
+					;;
+			esac
+		done < "$STATE"
+		rm -f "$STATE"
+	fi
+
+	# 兜底：清掉可能残留的 udp2rawDwrW_* 链
+	cleanup_legacy_chains
+
+	rm -f "$RUN_DIR"/udpspeeder.*.pid "$RUN_DIR"/udp2raw.*.pid
+	log notice "stopped"
+}
+
+boot() { start; }
+
+restart() { stop; sleep 1; start; }
+reload()  { restart; }
